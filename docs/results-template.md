@@ -4,11 +4,14 @@
 - Device / Simulator:
 - iOS version:
 - RN version:
-- Build identifier (optional):
-- Notes (thermal state, background apps, background services, etc.):
+- Commit SHA:
+- Notes (thermal state, background apps, etc.):
+- Limitation note for thesis write-up:
+  Measurements are collected on iOS Simulator; discuss implications for bridge latency, native scheduling, CPU behavior, and memory behavior.
 
 ## CSV Notes
-- Filter/group by `benchmarkCategory`: `crdt_interval`, `crdt_burst`.
+- Filter/group by `benchmarkCategory`: `crdt_interval`, `crdt_burst`, `dashboard_continuous`.
+- For dashboard-derived workload analysis, report **mean** and **standard deviation** after at least **5 repetitions per mode**.
 
 ## Sustained Runs (60s)
 
@@ -61,3 +64,54 @@
 | Native | 10000              | 1     |                |                |                  |       |
 | Native | 10000              | 2     |                |                |                  |       |
 | Native | 10000              | 3     |                |                |                  |       |
+
+## Dashboard-Derived Workload Benchmark
+
+Official scenarios:
+- `dashboard_continuous_5000_20ms`
+- `dashboard_continuous_10000_50ms`
+- `dashboard_continuous_10000_20ms`
+
+| Mode | workloadSize | Interval (ms) | Run # | operationCount | avgOpMs | maxOpMs | Notes |
+|------|--------------|---------------|-------|----------------|---------|---------|-------|
+| JS   | 5000         | 20            | 1     |                |         |         |       |
+| JS   | 5000         | 20            | 2     |                |         |         |       |
+| JS   | 5000         | 20            | 3     |                |         |         |       |
+| JS   | 5000         | 20            | 4     |                |         |         |       |
+| JS   | 5000         | 20            | 5     |                |         |         |       |
+| Native | 5000       | 20            | 1     |                |         |         |       |
+| Native | 5000       | 20            | 2     |                |         |         |       |
+| Native | 5000       | 20            | 3     |                |         |         |       |
+| Native | 5000       | 20            | 4     |                |         |         |       |
+| Native | 5000       | 20            | 5     |                |         |         |       |
+| JS   | 10000        | 50            | 1     |                |         |         |       |
+| JS   | 10000        | 50            | 2     |                |         |         |       |
+| JS   | 10000        | 50            | 3     |                |         |         |       |
+| JS   | 10000        | 50            | 4     |                |         |         |       |
+| JS   | 10000        | 50            | 5     |                |         |         |       |
+| Native | 10000      | 50            | 1     |                |         |         |       |
+| Native | 10000      | 50            | 2     |                |         |         |       |
+| Native | 10000      | 50            | 3     |                |         |         |       |
+| Native | 10000      | 50            | 4     |                |         |         |       |
+| Native | 10000      | 50            | 5     |                |         |         |       |
+| JS   | 10000        | 20            | 1     |                |         |         |       |
+| JS   | 10000        | 20            | 2     |                |         |         |       |
+| JS   | 10000        | 20            | 3     |                |         |         |       |
+| JS   | 10000        | 20            | 4     |                |         |         |       |
+| JS   | 10000        | 20            | 5     |                |         |         |       |
+| Native | 10000      | 20            | 1     |                |         |         |       |
+| Native | 10000      | 20            | 2     |                |         |         |       |
+| Native | 10000      | 20            | 3     |                |         |         |       |
+| Native | 10000      | 20            | 4     |                |         |         |       |
+| Native | 10000      | 20            | 5     |                |         |         |       |
+
+## Dashboard Summary Statistics
+
+| Mode | workloadSize | Interval (ms) | Mean operationCount | StdDev operationCount | Mean avgOpMs | StdDev avgOpMs | Mean maxOpMs | StdDev maxOpMs |
+|------|--------------|---------------|---------------------|-----------------------|--------------|----------------|--------------|----------------|
+| JS   | 5000         | 20            |                     |                       |              |                |              |                |
+| Native | 5000       | 20            |                     |                       |              |                |              |                |
+| JS   | 10000        | 50            |                     |                       |              |                |              |                |
+| Native | 10000      | 50            |                     |                       |              |                |              |                |
+| JS   | 10000        | 20            |                     |                       |              |                |              |                |
+| Native | 10000      | 20            |                     |                       |              |                |              |                |

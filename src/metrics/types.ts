@@ -1,6 +1,13 @@
 export type BenchmarkMode = 'js' | 'native';
 
-export type BenchmarkCategory = 'crdt_interval' | 'crdt_burst';
+export type BenchmarkCategory =
+  | 'crdt_interval'
+  | 'crdt_burst'
+  | 'dashboard_heavy'
+  | 'dashboard_continuous'
+  | 'ui_rendering_stress'
+  | 'lww_register'
+  | 'network_condition_demo';
 
 export type BenchmarkRun = {
   runId: string;

@@ -57,7 +57,6 @@ export class BenchmarkLogger {
       ...runWithoutId,
     };
 
-    // Minimal sanity checks to keep logs consistent/deterministic for analysis.
     if (
       typeof run.scenarioName !== 'string' ||
       run.scenarioName.trim() === ''
@@ -69,7 +68,6 @@ export class BenchmarkLogger {
       throw new Error('mode must be defined');
     }
 
-    // If timestamps are empty, default them to "now" (ISO).
     if (typeof run.startedAt !== 'string' || run.startedAt.trim() === '') {
       run.startedAt = toISOStringSafe(now);
     }
