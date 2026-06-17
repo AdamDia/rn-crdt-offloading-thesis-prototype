@@ -1,5 +1,6 @@
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {
+  Alert,
   Pressable,
   SafeAreaView,
   ScrollView,
@@ -338,6 +339,20 @@ export function DashboardBenchmarkScreen(): React.JSX.Element {
     }
   }, []);
 
+  const stopFirstToChangeSettings = useCallback(() => {
+    Alert.alert(
+      'Stop first',
+      'Stop the current dashboard run before changing workload settings.',
+    );
+  }, []);
+
+  const stopFirstToStartAnotherRun = useCallback(() => {
+    Alert.alert(
+      'Stop first',
+      'Stop the current dashboard run before starting a different dashboard task.',
+    );
+  }, []);
+
   const stopUiStressLoop = useCallback(() => {
     stressModeRef.current = 'idle';
     stressTickInFlightRef.current = false;
@@ -455,6 +470,7 @@ export function DashboardBenchmarkScreen(): React.JSX.Element {
   const startContinuous = useCallback(
     (mode: Exclude<ContinuousMode, 'idle'>) => {
       if (isAnyRunning) {
+        stopFirstToStartAnotherRun();
         return;
       }
 
@@ -519,6 +535,7 @@ export function DashboardBenchmarkScreen(): React.JSX.Element {
       selectedIntervalMs,
       selectedSize,
       stopAndLogContinuousRun,
+      stopFirstToStartAnotherRun,
       stopContinuousLoop,
     ],
   );
@@ -526,6 +543,7 @@ export function DashboardBenchmarkScreen(): React.JSX.Element {
   const startUiStress = useCallback(
     (mode: Exclude<UiStressMode, 'idle'>) => {
       if (isAnyRunning) {
+        stopFirstToStartAnotherRun();
         return;
       }
 
@@ -609,6 +627,7 @@ export function DashboardBenchmarkScreen(): React.JSX.Element {
       isAnyRunning,
       resetUiStressMetrics,
       stopAndLogUiStressRun,
+      stopFirstToStartAnotherRun,
       stopUiStressLoop,
     ],
   );
@@ -691,14 +710,26 @@ export function DashboardBenchmarkScreen(): React.JSX.Element {
           <Segment
             options={sizeOptions}
             selected={selectedSize}
-            onSelect={setSelectedSize}
+            onSelect={value => {
+              if (isAnyRunning) {
+                stopFirstToChangeSettings();
+                return;
+              }
+              setSelectedSize(value);
+            }}
             labelFn={formatSizeLabel}
           />
           <Text style={styles.note}>Update interval</Text>
           <Segment
             options={intervalOptions}
             selected={selectedIntervalMs}
-            onSelect={setSelectedIntervalMs}
+            onSelect={value => {
+              if (isAnyRunning) {
+                stopFirstToChangeSettings();
+                return;
+              }
+              setSelectedIntervalMs(value);
+            }}
             labelFn={formatIntervalLabel}
           />
           <Text style={styles.note}>
