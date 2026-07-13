@@ -1,18 +1,13 @@
 #import "AppDelegate.h"
 
 #import <React/RCTBundleURLProvider.h>
+#import <React-RCTAppDelegate/RCTDefaultReactNativeFactoryDelegate.h>
+#import <ReactAppDependencyProvider/RCTAppDependencyProvider.h>
 
-@implementation AppDelegate
+@interface RNReactNativeDelegate : RCTDefaultReactNativeFactoryDelegate
+@end
 
-- (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions
-{
-  self.moduleName = @"RNOffloadingBenchmark";
-  // You can add your custom initial props in the dictionary below.
-  // They will be passed down to the ViewController used by React Native.
-  self.initialProps = @{};
-
-  return [super application:application didFinishLaunchingWithOptions:launchOptions];
-}
+@implementation RNReactNativeDelegate
 
 - (NSURL *)sourceURLForBridge:(RCTBridge *)bridge
 {
@@ -22,9 +17,6 @@
 - (NSURL *)bundleURL
 {
 #if DEBUG
-  // In some cases the simulator can end up with an empty/invalid packager host setting,
-  // causing `jsBundleURLForBundleRoot` to return nil and the app to crash with
-  // "No bundle URL present". Provide a robust localhost fallback for development.
   RCTBundleURLProvider *provider = [RCTBundleURLProvider sharedSettings];
   NSURL *url = [provider jsBundleURLForBundleRoot:@"index"
                                fallbackURLProvider:^NSURL *{
@@ -39,6 +31,25 @@
 #else
   return [[NSBundle mainBundle] URLForResource:@"main" withExtension:@"jsbundle"];
 #endif
+}
+
+@end
+
+@implementation AppDelegate
+
+- (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions
+{
+  RNReactNativeDelegate *delegate = [RNReactNativeDelegate new];
+  delegate.dependencyProvider = [RCTAppDependencyProvider new];
+  self.reactNativeDelegate = delegate;
+  self.reactNativeFactory = [[RCTReactNativeFactory alloc] initWithDelegate:delegate];
+  self.window = [[UIWindow alloc] initWithFrame:[UIScreen mainScreen].bounds];
+
+  [self.reactNativeFactory startReactNativeWithModuleName:@"RNOffloadingBenchmark"
+                                                 inWindow:self.window
+                                        initialProperties:@{}
+                                            launchOptions:launchOptions];
+  return YES;
 }
 
 @end
