@@ -10,8 +10,17 @@
   Measurements are collected on iOS Simulator; discuss implications for bridge latency, native scheduling, CPU behavior, and memory behavior.
 
 ## CSV Notes
-- Filter/group by `benchmarkCategory`: `crdt_interval`, `crdt_burst`, `dashboard_continuous`.
+- Filter/group by `benchmarkCategory`: `crdt_interval`, `crdt_burst`, `dashboard_continuous`, `architecture_comparison`.
 - For dashboard-derived workload analysis, report **mean** and **standard deviation** after at least **5 repetitions per mode**.
+- For architecture comparison, separate:
+  - per-operation increment scenarios
+  - one-call burst merge scenarios
+
+## Validation Checklist
+- [ ] LWW Register validation passes in JavaScript and native Swift
+- [ ] Connectivity check responds correctly under normal network conditions
+- [ ] Connectivity check responds correctly when Network Link Conditioner forces failure
+- [ ] Reconnection burst demo reports final value, burst size, and merge time
 
 ## Sustained Runs (60s)
 
@@ -115,3 +124,31 @@ Official scenarios:
 | Native | 10000      | 50            |                     |                       |              |                |              |                |
 | JS   | 10000        | 20            |                     |                       |              |                |              |                |
 | Native | 10000      | 20            |                     |                       |              |                |              |                |
+
+## Architecture Comparison — Per-operation Increments
+
+| Mode | Size | Run # | operationCount | finalCrdtValue | totalTimeMs | avgOpMs | Notes |
+|------|------|-------|----------------|----------------|-------------|---------|-------|
+| JS | 1000 | 1 | | | | | |
+| Classic Bridge | 1000 | 1 | | | | | |
+| TurboModule | 1000 | 1 | | | | | |
+| JS | 5000 | 1 | | | | | |
+| Classic Bridge | 5000 | 1 | | | | | |
+| TurboModule | 5000 | 1 | | | | | |
+| JS | 10000 | 1 | | | | | |
+| Classic Bridge | 10000 | 1 | | | | | |
+| TurboModule | 10000 | 1 | | | | | |
+
+## Architecture Comparison — Burst Merges
+
+| Mode | burstSize | Run # | operationCount | finalCrdtValue | burstMergeTimeMs | Notes |
+|------|-----------|-------|----------------|----------------|------------------|-------|
+| JS | 1000 | 1 | | | | |
+| Classic Bridge | 1000 | 1 | | | | |
+| TurboModule | 1000 | 1 | | | | |
+| JS | 5000 | 1 | | | | |
+| Classic Bridge | 5000 | 1 | | | | |
+| TurboModule | 5000 | 1 | | | | |
+| JS | 10000 | 1 | | | | |
+| Classic Bridge | 10000 | 1 | | | | |
+| TurboModule | 10000 | 1 | | | | |

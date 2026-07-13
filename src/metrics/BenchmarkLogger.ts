@@ -47,6 +47,18 @@ const CSV_HEADERS: Array<keyof BenchmarkRun> = [
   'notes',
 ];
 
+function buildCSV(runs: BenchmarkRun[]): string {
+  const lines: string[] = [];
+  lines.push(CSV_HEADERS.join(','));
+
+  for (const run of runs) {
+    const row = CSV_HEADERS.map(h => csvEscape(run[h]));
+    lines.push(row.join(','));
+  }
+
+  return `${lines.join('\n')}\n`;
+}
+
 export class BenchmarkLogger {
   private runs: BenchmarkRun[] = [];
 
@@ -87,15 +99,18 @@ export class BenchmarkLogger {
     this.runs = [];
   }
 
+  removeRuns(predicate: (run: BenchmarkRun) => boolean): number {
+    const nextRuns = this.runs.filter(run => !predicate(run));
+    const removedCount = this.runs.length - nextRuns.length;
+    this.runs = nextRuns;
+    return removedCount;
+  }
+
+  exportRunsToCSV(runs: BenchmarkRun[]): string {
+    return buildCSV(runs);
+  }
+
   exportToCSV(): string {
-    const lines: string[] = [];
-    lines.push(CSV_HEADERS.join(','));
-
-    for (const run of this.runs) {
-      const row = CSV_HEADERS.map(h => csvEscape(run[h]));
-      lines.push(row.join(','));
-    }
-
-    return `${lines.join('\n')}\n`;
+    return buildCSV(this.runs);
   }
 }

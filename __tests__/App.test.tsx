@@ -6,12 +6,26 @@ import 'react-native';
 import React from 'react';
 import App from '../App';
 
-// Note: import explicitly to use the types shipped with jest.
-import {it} from '@jest/globals';
+import {beforeAll, it, jest} from '@jest/globals';
 
-// Note: test renderer must be required after react-native.
-import renderer from 'react-test-renderer';
+import renderer, {act} from 'react-test-renderer';
+
+beforeAll(() => {
+  const globalWithWindow = global as typeof globalThis & {
+    window?: {dispatchEvent?: jest.Mock};
+  };
+
+  Object.defineProperty(global, 'window', {
+    value: globalWithWindow.window ?? {},
+    writable: true,
+    configurable: true,
+  });
+
+  globalWithWindow.window!.dispatchEvent = jest.fn();
+});
 
 it('renders correctly', () => {
-  renderer.create(<App />);
+  act(() => {
+    renderer.create(<App />);
+  });
 });

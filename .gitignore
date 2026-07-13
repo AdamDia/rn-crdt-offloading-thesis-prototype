@@ -20,8 +20,6 @@ DerivedData
 *.hmap
 *.ipa
 *.xcuserstate
-*.xcresult
-*.xcarchive
 **/.xcode.env.local
 
 # Android/IntelliJ
@@ -41,8 +39,8 @@ local.properties
 node_modules/
 npm-debug.log
 yarn-error.log
-.env
-.env.*
+*.log
+logs/
 
 # fastlane
 #
@@ -65,6 +63,25 @@ yarn-error.log
 
 # Temporary files created by Metro to check the health of the file watcher
 .metro-health-check*
+
+# Local environment
+.env
+.env.*
+!.env.example
+ios/.xcode.env.local
+
+# React Native / Codegen
+/ios/build/
+/android/app/build/
+/android/build/
+/build/
+/ios/generated/
+/android/generated/
+/ios/RNOffloadingBenchmark.xcworkspace/xcuserdata/
+
+# Exported results
+benchmark-results.csv
+results/*.csv
 
 # testing
 /coverage

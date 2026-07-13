@@ -1,10 +1,17 @@
 import React, {useState} from 'react';
 import {Pressable, SafeAreaView, StyleSheet, Text, View} from 'react-native';
 
+import {ArchitectureComparisonScreen} from './src/screens/ArchitectureComparisonScreen';
 import {BenchmarkScreen} from './src/screens/BenchmarkScreen';
 import {DashboardBenchmarkScreen} from './src/screens/DashboardBenchmarkScreen';
 
-type ScreenKey = 'crdt' | 'dashboard';
+type ScreenKey = 'crdt' | 'dashboard' | 'architecture';
+
+const SCREEN_TABS: Array<{key: ScreenKey; label: string}> = [
+  {key: 'crdt', label: 'CRDT Benchmark'},
+  {key: 'dashboard', label: 'Dashboard Benchmark'},
+  {key: 'architecture', label: 'Architecture Comparison'},
+];
 
 function App(): React.JSX.Element {
   const [screen, setScreen] = useState<ScreenKey>('crdt');
@@ -12,40 +19,34 @@ function App(): React.JSX.Element {
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.switcher}>
-        <Pressable
-          onPress={() => setScreen('crdt')}
-          style={({pressed}) => [
-            styles.tab,
-            screen === 'crdt' && styles.tabSelected,
-            pressed && styles.tabPressed,
-          ]}>
-          <Text
-            style={[
-              styles.tabText,
-              screen === 'crdt' && styles.tabTextSelected,
+        {SCREEN_TABS.map(tab => (
+          <Pressable
+            key={tab.key}
+            onPress={() => setScreen(tab.key)}
+            style={({pressed}) => [
+              styles.tab,
+              screen === tab.key && styles.tabSelected,
+              pressed && styles.tabPressed,
             ]}>
-            CRDT Benchmark
-          </Text>
-        </Pressable>
-        <Pressable
-          onPress={() => setScreen('dashboard')}
-          style={({pressed}) => [
-            styles.tab,
-            screen === 'dashboard' && styles.tabSelected,
-            pressed && styles.tabPressed,
-          ]}>
-          <Text
-            style={[
-              styles.tabText,
-              screen === 'dashboard' && styles.tabTextSelected,
-            ]}>
-            Dashboard Workload
-          </Text>
-        </Pressable>
+            <Text
+              style={[
+                styles.tabText,
+                screen === tab.key && styles.tabTextSelected,
+              ]}>
+              {tab.label}
+            </Text>
+          </Pressable>
+        ))}
       </View>
 
       <View style={styles.content}>
-        {screen === 'crdt' ? <BenchmarkScreen /> : <DashboardBenchmarkScreen />}
+        {screen === 'crdt' ? (
+          <BenchmarkScreen />
+        ) : screen === 'dashboard' ? (
+          <DashboardBenchmarkScreen />
+        ) : (
+          <ArchitectureComparisonScreen />
+        )}
       </View>
     </SafeAreaView>
   );
@@ -80,9 +81,10 @@ const styles = StyleSheet.create({
   tabPressed: {opacity: 0.9},
   tabText: {
     textAlign: 'center',
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '700',
     color: '#111',
+    lineHeight: 14,
   },
   tabTextSelected: {color: '#fff'},
   content: {flex: 1},
