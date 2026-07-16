@@ -11,6 +11,11 @@ import {
 
 import {runDashboardComputation} from '../dashboard/js/dashboardComputation';
 import type {DashboardComputationResult} from '../dashboard/types';
+import {
+  BenchmarkRunLifecycle,
+  createRunId,
+  type ActiveRunSnapshot,
+} from '../benchmarks/runLifecycle';
 import {sharedBenchmarkLogger} from '../metrics/sharedLogger';
 import type {BenchmarkRun} from '../metrics/types';
 import {CSVExport} from '../native/CSVExport';
@@ -19,6 +24,10 @@ import {NativeCRDT} from '../native/NativeCRDT';
 type WorkloadSize = 1000 | 5000 | 10000;
 type IntervalOption = 100 | 50 | 20;
 type RunMode = 'idle' | 'js' | 'native';
+type DashboardRunSnapshot = ActiveRunSnapshot<
+  Exclude<RunMode, 'idle'>,
+  {intervalMs: IntervalOption; workloadSize: WorkloadSize}
+>;
 
 const BENCHMARK_DURATION_MS = 60_000;
 const PREVIEW_BAR_COUNT = 60;
@@ -195,12 +204,17 @@ export function DashboardBenchmarkScreen(): React.JSX.Element {
 
   const tickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const autoStopTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const runningModeRef = useRef<RunMode>('idle');
   const startedAtRef = useRef('');
   const runStartPerfRef = useRef(0);
   const operationTimesRef = useRef<number[]>([]);
   const operationCountRef = useRef(0);
   const latestResultRef = useRef<DashboardComputationResult | null>(null);
+  const lifecycleRef = useRef(
+    new BenchmarkRunLifecycle<
+      Exclude<RunMode, 'idle'>,
+      {intervalMs: IntervalOption; workloadSize: WorkloadSize}
+    >(),
+  );
 
   const isRunning = mode !== 'idle';
   const previewBars = useMemo(
@@ -227,13 +241,44 @@ export function DashboardBenchmarkScreen(): React.JSX.Element {
   }, []);
 
   const stopLoop = useCallback(() => {
-    runningModeRef.current = 'idle';
     clearTickTimer();
     clearAutoStopTimer();
     setMode('idle');
   }, [clearAutoStopTimer, clearTickTimer]);
 
+  const finalizeAutoRun = useCallback(
+    (snapshot: DashboardRunSnapshot) => {
+      stopLoop();
+
+      if (latestResultRef.current !== null) {
+        sharedBenchmarkLogger.addRun({
+          startedAt: snapshot.startedAt,
+          endedAt: new Date().toISOString(),
+          mode: snapshot.mode,
+          benchmarkCategory: 'dashboard_continuous',
+          scenarioName: `dashboard_continuous_${snapshot.config.workloadSize}_${snapshot.config.intervalMs}ms`,
+          intervalMs: snapshot.config.intervalMs,
+          durationMs: snapshot.configuredDurationMs,
+          operationCount,
+          finalCrdtValue: Math.round(latestResultRef.current.checksum),
+          averageOperationTimeMs: avgOpMs,
+          maxOperationTimeMs: maxOpMs,
+          burstSize: 0,
+          burstMergeTimeMs: 0,
+          notes: 'Completed full 60s dashboard workload benchmark',
+        });
+        setSavedRunsCount(getDashboardRuns().length);
+      }
+
+      setElapsedMs(snapshot.configuredDurationMs);
+      setRemainingMs(0);
+      setStatusMessage('Dashboard run completed and logged.');
+    },
+    [avgOpMs, maxOpMs, operationCount, stopLoop],
+  );
+
   const resetState = useCallback(() => {
+    lifecycleRef.current.cleanup();
     stopLoop();
     setElapsedMs(0);
     setRemainingMs(BENCHMARK_DURATION_MS);
@@ -250,61 +295,33 @@ export function DashboardBenchmarkScreen(): React.JSX.Element {
     operationCountRef.current = 0;
   }, [stopLoop]);
 
-  const stopAndLogRun = useCallback(
-    (reason: 'manual' | 'auto') => {
-      if (runningModeRef.current === 'idle') {
-        stopLoop();
-        return;
-      }
-
-      const completedMode = runningModeRef.current;
-      stopLoop();
-
-      if (startedAtRef.current && latestResultRef.current) {
-        sharedBenchmarkLogger.addRun({
-          startedAt: startedAtRef.current,
-          endedAt: new Date().toISOString(),
-          mode: completedMode,
-          benchmarkCategory: 'dashboard_continuous',
-          scenarioName: `dashboard_continuous_${selectedSize}_${selectedIntervalMs}ms`,
-          intervalMs: selectedIntervalMs,
-          durationMs: elapsedMs,
-          operationCount,
-          finalCrdtValue: Math.round(latestResultRef.current.checksum),
-          averageOperationTimeMs: avgOpMs,
-          maxOperationTimeMs: maxOpMs,
-          burstSize: 0,
-          burstMergeTimeMs: 0,
-          notes:
-            reason === 'manual'
-              ? 'Manual stop before 60s; exclude from official data'
-              : 'Completed full 60s dashboard workload benchmark',
-        });
-        setSavedRunsCount(getDashboardRuns().length);
-      }
-
-      setStatusMessage(
-        reason === 'manual'
-          ? 'Dashboard run stopped before 60 seconds.'
-          : 'Dashboard run completed and logged.',
-      );
-    },
-    [avgOpMs, elapsedMs, maxOpMs, operationCount, selectedIntervalMs, selectedSize, stopLoop],
-  );
-
   const computeTick = useCallback(
-    async (runMode: 'js' | 'native') => {
+    async (runMode: 'js' | 'native', workloadSize: WorkloadSize) => {
       if (runMode === 'native') {
-        return NativeCRDT.runDashboardComputation(selectedSize);
+        return NativeCRDT.runDashboardComputation(workloadSize);
       }
-      return runDashboardComputation(selectedSize);
+      return runDashboardComputation(workloadSize);
     },
-    [selectedSize],
+    [],
   );
+
+  const stopCurrentRun = useCallback(() => {
+    const activeRun = lifecycleRef.current.getActiveRun();
+    if (activeRun === null) {
+      stopLoop();
+      return;
+    }
+
+    lifecycleRef.current.stopRun(activeRun.runId, () => {
+      stopLoop();
+      setMode('idle');
+      setStatusMessage('Dashboard run stopped before 60 seconds.');
+    });
+  }, [stopLoop]);
 
   const startBenchmark = useCallback(
     async (runMode: 'js' | 'native') => {
-      if (runningModeRef.current !== 'idle') {
+      if (lifecycleRef.current.hasActiveRun()) {
         return;
       }
 
@@ -322,16 +339,41 @@ export function DashboardBenchmarkScreen(): React.JSX.Element {
       operationTimesRef.current = [];
       operationCountRef.current = 0;
       latestResultRef.current = null;
-      runningModeRef.current = runMode;
+      const runSnapshot = lifecycleRef.current.startRun(
+        {
+          runId: createRunId(),
+          mode: runMode,
+          startedAt: startedAtRef.current,
+          startPerfMs: runStartPerfRef.current,
+          configuredDurationMs: BENCHMARK_DURATION_MS,
+          config: {
+            intervalMs: selectedIntervalMs,
+            workloadSize: selectedSize,
+          },
+        },
+        finalizeAutoRun,
+      );
+
+      if (runSnapshot === null) {
+        return;
+      }
 
       const tick = async () => {
-        if (runningModeRef.current !== runMode) {
+        if (!lifecycleRef.current.isActiveRun(runSnapshot.runId)) {
           return;
         }
 
         try {
           const operationStartedAt = nowMs();
-          const nextResult = await computeTick(runMode);
+          const nextResult = await computeTick(
+            runSnapshot.mode,
+            runSnapshot.config.workloadSize,
+          );
+
+          if (!lifecycleRef.current.isActiveRun(runSnapshot.runId)) {
+            return;
+          }
+
           const operationDuration = nowMs() - operationStartedAt;
           operationTimesRef.current.push(operationDuration);
           operationCountRef.current += 1;
@@ -346,10 +388,12 @@ export function DashboardBenchmarkScreen(): React.JSX.Element {
           setAvgOpMs(mean(operationTimesRef.current));
           setMaxOpMs(Math.max(...operationTimesRef.current));
 
-          if (runningModeRef.current === runMode) {
-            tickTimerRef.current = setTimeout(tick, selectedIntervalMs);
+          const nextTimer = setTimeout(tick, runSnapshot.config.intervalMs);
+          if (lifecycleRef.current.setTickTimer(runSnapshot.runId, nextTimer)) {
+            tickTimerRef.current = nextTimer;
           }
         } catch (error: any) {
+          lifecycleRef.current.cleanup();
           stopLoop();
           setStatusMessage(
             `Dashboard run failed: ${String(error?.message ?? error)}`,
@@ -357,13 +401,9 @@ export function DashboardBenchmarkScreen(): React.JSX.Element {
         }
       };
 
-      autoStopTimerRef.current = setTimeout(() => {
-        stopAndLogRun('auto');
-      }, BENCHMARK_DURATION_MS);
-
       fireAndForget(tick());
     },
-    [computeTick, selectedIntervalMs, stopAndLogRun, stopLoop],
+    [computeTick, finalizeAutoRun, selectedIntervalMs, selectedSize, stopLoop],
   );
 
   const clearResults = useCallback(() => {
@@ -412,7 +452,9 @@ export function DashboardBenchmarkScreen(): React.JSX.Element {
   }, []);
 
   useEffect(() => {
+    const lifecycle = lifecycleRef.current;
     return () => {
+      lifecycle.cleanup();
       stopLoop();
     };
   }, [stopLoop]);
@@ -488,7 +530,7 @@ export function DashboardBenchmarkScreen(): React.JSX.Element {
           <View style={styles.buttonRow}>
             <Button
               title="Stop"
-              onPress={() => stopAndLogRun('manual')}
+              onPress={stopCurrentRun}
               disabled={!isRunning}
               kind="danger"
               layout="full"

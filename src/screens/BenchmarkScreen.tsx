@@ -13,6 +13,11 @@ import {MetricsPanel} from '../components/MetricsPanel';
 import {GCounter} from '../crdt/js/GCounter';
 import {LWWRegister} from '../crdt/js/LWWRegister';
 import type {LWWRegisterState} from '../crdt/js/lwwTypes';
+import {
+  BenchmarkRunLifecycle,
+  createRunId,
+  type ActiveRunSnapshot,
+} from '../benchmarks/runLifecycle';
 import {sharedBenchmarkLogger} from '../metrics/sharedLogger';
 import type {BenchmarkRun} from '../metrics/types';
 import {CSVExport} from '../native/CSVExport';
@@ -21,6 +26,10 @@ import {NativeCRDT} from '../native/NativeCRDT';
 type Mode = 'idle' | 'js' | 'native';
 type IntervalOption = 100 | 50 | 20;
 type NetworkStatus = 'unknown' | 'online' | 'offline';
+type IntervalRunSnapshot = ActiveRunSnapshot<
+  Exclude<Mode, 'idle'>,
+  {intervalMs: IntervalOption}
+>;
 
 type MetricsSnapshot = {
   crdtValue: number;
@@ -191,10 +200,12 @@ export function BenchmarkScreen(): React.JSX.Element {
   const counterRef = useRef(new GCounter('local'));
   const tickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const autoStopTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const runningModeRef = useRef<Mode>('idle');
   const startedAtRef = useRef('');
   const runStartPerfRef = useRef(0);
   const operationTimesRef = useRef<number[]>([]);
+  const lifecycleRef = useRef(
+    new BenchmarkRunLifecycle<Exclude<Mode, 'idle'>, {intervalMs: IntervalOption}>(),
+  );
   const metricsRef = useRef<MetricsSnapshot>({
     crdtValue: 0,
     elapsedMs: 0,
@@ -252,7 +263,6 @@ export function BenchmarkScreen(): React.JSX.Element {
   }, []);
 
   const stopLoop = useCallback(() => {
-    runningModeRef.current = 'idle';
     clearTickTimer();
     clearAutoStopTimer();
   }, [clearAutoStopTimer, clearTickTimer]);
@@ -276,7 +286,51 @@ export function BenchmarkScreen(): React.JSX.Element {
     [selectedIntervalMs, updateMetrics],
   );
 
+  const setIdleMetrics = useCallback(
+    (next: MetricsSnapshot) => {
+      updateMetrics({...next, mode: 'idle'});
+    },
+    [updateMetrics],
+  );
+
+  const finalizeAutoRun = useCallback(
+    (snapshot: IntervalRunSnapshot) => {
+      const current = metricsRef.current;
+      if (current.mode === 'idle' || current.mode !== snapshot.mode) {
+        return;
+      }
+
+      stopLoop();
+      sharedBenchmarkLogger.addRun({
+        startedAt: snapshot.startedAt,
+        endedAt: new Date().toISOString(),
+        mode: snapshot.mode,
+        benchmarkCategory: 'crdt_interval',
+        scenarioName: `interval_${snapshot.config.intervalMs}ms`,
+        intervalMs: snapshot.config.intervalMs,
+        durationMs: snapshot.configuredDurationMs,
+        operationCount: current.operationCount,
+        finalCrdtValue: current.crdtValue,
+        averageOperationTimeMs: current.averageOperationTimeMs,
+        maxOperationTimeMs: current.maxOperationTimeMs,
+        burstSize: 0,
+        burstMergeTimeMs: 0,
+        notes: 'Completed full 60s interval benchmark',
+      });
+      setSavedRunsCount(getCrdtRuns().length);
+      setRemainingMs(0);
+      setIdleMetrics({
+        ...current,
+        elapsedMs: snapshot.configuredDurationMs,
+        selectedIntervalMs: snapshot.config.intervalMs,
+      });
+      setStatusMessage('Benchmark completed and logged.');
+    },
+    [setIdleMetrics, stopLoop],
+  );
+
   const resetAll = useCallback(async () => {
+    lifecycleRef.current.cleanup();
     stopLoop();
     counterRef.current.reset();
     try {
@@ -287,52 +341,32 @@ export function BenchmarkScreen(): React.JSX.Element {
     setBurstResult('');
   }, [resetMetrics, stopLoop]);
 
-  const stopAndLogRun = useCallback(
-    async (reason: 'manual' | 'auto') => {
-      const current = metricsRef.current;
-      if (current.mode === 'idle') {
+  const stopCurrentRun = useCallback(
+    (reason: 'manual' | 'auto') => {
+      const activeRun = lifecycleRef.current.getActiveRun();
+      if (activeRun === null) {
         stopLoop();
         return;
       }
 
-      stopLoop();
-
-      if (current.operationCount > 0 && startedAtRef.current.length > 0) {
-        sharedBenchmarkLogger.addRun({
-          startedAt: startedAtRef.current,
-          endedAt: new Date().toISOString(),
-          mode: current.mode,
-          benchmarkCategory: 'crdt_interval',
-          scenarioName: `interval_${current.selectedIntervalMs}ms`,
-          intervalMs: current.selectedIntervalMs,
-          durationMs: current.elapsedMs,
-          operationCount: current.operationCount,
-          finalCrdtValue: current.crdtValue,
-          averageOperationTimeMs: current.averageOperationTimeMs,
-          maxOperationTimeMs: current.maxOperationTimeMs,
-          burstSize: 0,
-          burstMergeTimeMs: 0,
-          notes:
-            reason === 'manual'
-              ? 'Manual stop before 60s; exclude from repeated-measurement analysis'
-              : 'Completed full 60s interval benchmark',
-        });
-        setSavedRunsCount(getCrdtRuns().length);
+      if (reason === 'auto') {
+        lifecycleRef.current.stopRun(activeRun.runId, finalizeAutoRun);
+        return;
       }
 
-      updateMetrics({...current, mode: 'idle'});
-      setStatusMessage(
-        reason === 'manual'
-          ? 'Benchmark stopped before 60 seconds.'
-          : 'Benchmark completed and logged.',
-      );
+      const current = metricsRef.current;
+      lifecycleRef.current.stopRun(activeRun.runId, () => {
+        stopLoop();
+        setIdleMetrics(current);
+        setStatusMessage('Benchmark stopped before 60 seconds.');
+      });
     },
-    [stopLoop, updateMetrics],
+    [finalizeAutoRun, setIdleMetrics, stopLoop],
   );
 
   const startBenchmark = useCallback(
     async (mode: Exclude<Mode, 'idle'>) => {
-      if (runningModeRef.current !== 'idle') {
+      if (lifecycleRef.current.hasActiveRun()) {
         return;
       }
 
@@ -347,8 +381,24 @@ export function BenchmarkScreen(): React.JSX.Element {
       const startedAt = new Date().toISOString();
       startedAtRef.current = startedAt;
       runStartPerfRef.current = nowMs();
-      runningModeRef.current = mode;
       operationTimesRef.current = [];
+      const runSnapshot = lifecycleRef.current.startRun(
+        {
+          runId: createRunId(),
+          mode,
+          startedAt,
+          startPerfMs: runStartPerfRef.current,
+          configuredDurationMs: BENCHMARK_DURATION_MS,
+          config: {
+            intervalMs: selectedIntervalMs,
+          },
+        },
+        finalizeAutoRun,
+      );
+
+      if (runSnapshot === null) {
+        return;
+      }
 
       updateMetrics({
         crdtValue: 0,
@@ -362,18 +412,23 @@ export function BenchmarkScreen(): React.JSX.Element {
       setRemainingMs(BENCHMARK_DURATION_MS);
 
       const tick = async () => {
-        if (runningModeRef.current === 'idle') {
+        if (!lifecycleRef.current.isActiveRun(runSnapshot.runId)) {
           return;
         }
 
         const opStartedAt = nowMs();
         let value = 0;
-        if (mode === 'native') {
+        if (runSnapshot.mode === 'native') {
           value = await NativeCRDT.increment('local');
         } else {
           counterRef.current.increment();
           value = counterRef.current.value();
         }
+
+        if (!lifecycleRef.current.isActiveRun(runSnapshot.runId)) {
+          return;
+        }
+
         const opDuration = nowMs() - opStartedAt;
         operationTimesRef.current.push(opDuration);
 
@@ -384,24 +439,21 @@ export function BenchmarkScreen(): React.JSX.Element {
           operationCount: operationTimesRef.current.length,
           averageOperationTimeMs: mean(operationTimesRef.current),
           maxOperationTimeMs: Math.max(...operationTimesRef.current),
-          selectedIntervalMs,
-          mode,
+          selectedIntervalMs: runSnapshot.config.intervalMs,
+          mode: runSnapshot.mode,
         };
         updateMetrics(next);
         setRemainingMs(Math.max(0, BENCHMARK_DURATION_MS - elapsedMs));
 
-        if (runningModeRef.current === mode) {
-          tickTimerRef.current = setTimeout(tick, selectedIntervalMs);
+        const nextTimer = setTimeout(tick, runSnapshot.config.intervalMs);
+        if (lifecycleRef.current.setTickTimer(runSnapshot.runId, nextTimer)) {
+          tickTimerRef.current = nextTimer;
         }
       };
 
-      autoStopTimerRef.current = setTimeout(() => {
-        fireAndForget(stopAndLogRun('auto'));
-      }, BENCHMARK_DURATION_MS);
-
       fireAndForget(tick());
     },
-    [selectedIntervalMs, stopAndLogRun, updateMetrics],
+    [finalizeAutoRun, selectedIntervalMs, updateMetrics],
   );
 
   const runBurstMerge = useCallback(
@@ -752,7 +804,9 @@ export function BenchmarkScreen(): React.JSX.Element {
   }, [isRunning, isRunningLwwValidation, isRunningNetworkDemo]);
 
   useEffect(() => {
+    const lifecycle = lifecycleRef.current;
     return () => {
+      lifecycle.cleanup();
       stopLoop();
     };
   }, [stopLoop]);
@@ -822,7 +876,7 @@ export function BenchmarkScreen(): React.JSX.Element {
           <View style={styles.buttonRow}>
             <Button
               title="Stop"
-              onPress={() => fireAndForget(stopAndLogRun('manual'))}
+              onPress={() => stopCurrentRun('manual')}
               disabled={!isRunning}
               kind="danger"
               layout="full"
