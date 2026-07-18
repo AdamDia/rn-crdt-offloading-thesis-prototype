@@ -208,6 +208,9 @@ export function DashboardBenchmarkScreen(): React.JSX.Element {
   const runStartPerfRef = useRef(0);
   const operationTimesRef = useRef<number[]>([]);
   const operationCountRef = useRef(0);
+  const elapsedMsRef = useRef(0);
+  const avgOpMsRef = useRef(0);
+  const maxOpMsRef = useRef(0);
   const latestResultRef = useRef<DashboardComputationResult | null>(null);
   const lifecycleRef = useRef(
     new BenchmarkRunLifecycle<
@@ -259,10 +262,10 @@ export function DashboardBenchmarkScreen(): React.JSX.Element {
           scenarioName: `dashboard_continuous_${snapshot.config.workloadSize}_${snapshot.config.intervalMs}ms`,
           intervalMs: snapshot.config.intervalMs,
           durationMs: snapshot.configuredDurationMs,
-          operationCount,
+          operationCount: operationCountRef.current,
           finalCrdtValue: Math.round(latestResultRef.current.checksum),
-          averageOperationTimeMs: avgOpMs,
-          maxOperationTimeMs: maxOpMs,
+          averageOperationTimeMs: avgOpMsRef.current,
+          maxOperationTimeMs: maxOpMsRef.current,
           burstSize: 0,
           burstMergeTimeMs: 0,
           notes: 'Completed full 60s dashboard workload benchmark',
@@ -270,11 +273,15 @@ export function DashboardBenchmarkScreen(): React.JSX.Element {
         setSavedRunsCount(getDashboardRuns().length);
       }
 
+      elapsedMsRef.current = snapshot.configuredDurationMs;
       setElapsedMs(snapshot.configuredDurationMs);
+      setOperationCount(operationCountRef.current);
+      setAvgOpMs(avgOpMsRef.current);
+      setMaxOpMs(maxOpMsRef.current);
       setRemainingMs(0);
       setStatusMessage('Dashboard run completed and logged.');
     },
-    [avgOpMs, maxOpMs, operationCount, stopLoop],
+    [stopLoop],
   );
 
   const resetState = useCallback(() => {
@@ -293,6 +300,9 @@ export function DashboardBenchmarkScreen(): React.JSX.Element {
     runStartPerfRef.current = 0;
     operationTimesRef.current = [];
     operationCountRef.current = 0;
+    elapsedMsRef.current = 0;
+    avgOpMsRef.current = 0;
+    maxOpMsRef.current = 0;
   }, [stopLoop]);
 
   const computeTick = useCallback(
@@ -338,6 +348,9 @@ export function DashboardBenchmarkScreen(): React.JSX.Element {
       runStartPerfRef.current = nowMs();
       operationTimesRef.current = [];
       operationCountRef.current = 0;
+      elapsedMsRef.current = 0;
+      avgOpMsRef.current = 0;
+      maxOpMsRef.current = 0;
       latestResultRef.current = null;
       const runSnapshot = lifecycleRef.current.startRun(
         {
@@ -379,14 +392,20 @@ export function DashboardBenchmarkScreen(): React.JSX.Element {
           operationCountRef.current += 1;
 
           latestResultRef.current = nextResult;
+          const nextElapsedMs = nowMs() - runStartPerfRef.current;
+          const nextAvgOpMs = mean(operationTimesRef.current);
+          const nextMaxOpMs = Math.max(...operationTimesRef.current);
+          elapsedMsRef.current = nextElapsedMs;
+          avgOpMsRef.current = nextAvgOpMs;
+          maxOpMsRef.current = nextMaxOpMs;
           setResult(nextResult);
-          setElapsedMs(nowMs() - runStartPerfRef.current);
+          setElapsedMs(nextElapsedMs);
           setRemainingMs(
-            Math.max(0, BENCHMARK_DURATION_MS - (nowMs() - runStartPerfRef.current)),
+            Math.max(0, BENCHMARK_DURATION_MS - nextElapsedMs),
           );
           setOperationCount(operationCountRef.current);
-          setAvgOpMs(mean(operationTimesRef.current));
-          setMaxOpMs(Math.max(...operationTimesRef.current));
+          setAvgOpMs(nextAvgOpMs);
+          setMaxOpMs(nextMaxOpMs);
 
           const nextTimer = setTimeout(tick, runSnapshot.config.intervalMs);
           if (lifecycleRef.current.setTickTimer(runSnapshot.runId, nextTimer)) {
