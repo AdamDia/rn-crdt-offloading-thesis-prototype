@@ -13,7 +13,11 @@ type BenchmarkRun = ReturnType<typeof sharedBenchmarkLogger.getRuns>[number];
 function getDashboardRuns(): BenchmarkRun[] {
   return sharedBenchmarkLogger
     .getRuns()
-    .filter(run => run.benchmarkCategory === 'dashboard_continuous');
+    .filter(
+      run =>
+        run.benchmarkCategory === 'dashboard_continuous' ||
+        run.benchmarkCategory === 'offloading_decision_helper',
+    );
 }
 
 function findNodeByTitle(
@@ -100,6 +104,14 @@ beforeAll(() => {
       max: 0,
       trend: 0,
       normalizedValues: [],
+      checksum: 0,
+    })),
+    runDashboardComputationProfiled: jest.fn(async () => ({
+      nativeComputeTimeMs: 1,
+      average: 0,
+      min: 0,
+      max: 0,
+      trend: 0,
       checksum: 0,
     })),
     lwwSet: jest.fn(),
@@ -249,5 +261,172 @@ describe('DashboardBenchmarkScreen reset lifecycle', () => {
     expect(runs[1].averageOperationTimeMs).toBeGreaterThan(0);
     expect(runs[1].maxOperationTimeMs).toBeGreaterThan(0);
     expect(runs[1].finalCrdtValue).toBe(799004929);
+  });
+
+  it('disables the helper while an official dashboard run is active', async () => {
+    let tree: renderer.ReactTestRenderer;
+    await act(async () => {
+      tree = renderer.create(<DashboardBenchmarkScreen />);
+    });
+
+    const root = tree!.root;
+    await pressTitle(root, 'Start JS Dashboard');
+
+    expect(findNodeByTitle(root, 'Run Decision Test').props.disabled).toBe(true);
+  });
+
+  it('disables official dashboard starts while the helper is running', async () => {
+    let resolveProfiled: ((value: unknown) => void) | null = null;
+    (NativeModules.CRDTModule.runDashboardComputationProfiled as jest.Mock)
+      .mockImplementationOnce(
+        () =>
+          new Promise(resolve => {
+            resolveProfiled = resolve;
+          }),
+      )
+      .mockImplementation(async () => ({
+        nativeComputeTimeMs: 1,
+        average: 0,
+        min: 0,
+        max: 0,
+        trend: 0,
+        checksum: 0,
+      }));
+
+    let tree: renderer.ReactTestRenderer;
+    await act(async () => {
+      tree = renderer.create(<DashboardBenchmarkScreen />);
+    });
+
+    const root = tree!.root;
+    await pressTitle(root, 'Run Decision Test');
+
+    expect(findNodeByTitle(root, 'Start JS Dashboard').props.disabled).toBe(true);
+    expect(findNodeByTitle(root, 'Start Native Dashboard').props.disabled).toBe(
+      true,
+    );
+
+    await act(async () => {
+      resolveProfiled?.({
+        nativeComputeTimeMs: 1,
+        average: 0,
+        min: 0,
+        max: 0,
+        trend: 0,
+        checksum: 0,
+      });
+      await Promise.resolve();
+    });
+  });
+
+  it('renders separate validation rows and helper notes after a successful helper run', async () => {
+    (NativeModules.CRDTModule.runDashboardComputationProfiled as jest.Mock).mockImplementation(
+      async () => ({
+        nativeComputeTimeMs: 1,
+        average: 0,
+        min: 0,
+        max: 0,
+        trend: 0,
+        checksum: 799004929,
+      }),
+    );
+
+    let tree: renderer.ReactTestRenderer;
+    await act(async () => {
+      tree = renderer.create(<DashboardBenchmarkScreen />);
+    });
+
+    const root = tree!.root;
+    await pressText(root, '1000');
+    await pressTitle(root, 'Run Decision Test');
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    const textContent = JSON.stringify(tree!.toJSON());
+    expect(textContent).toContain(
+      'Timing values are reported as mean ± sample standard deviation.',
+    );
+    expect(textContent).toContain('Warm-up');
+    expect(textContent).toContain('1 unmeasured repetition');
+    expect(textContent).toContain('Measured repetitions');
+    expect(textContent).toContain('Result validation');
+    expect(textContent).toContain('Checksum difference');
+    expect(textContent).toContain('PASS');
+    expect(textContent).toContain('0.000000');
+    expect(textContent).toContain('Decision rule: Native is recommended only when the complete Classic Bridge round trip is faster than JavaScript computation.');
+    expect(textContent).toContain(' ms');
+  });
+
+  it('logs helper rows with warm-up metadata and measured operation count 5', async () => {
+    (NativeModules.CRDTModule.runDashboardComputationProfiled as jest.Mock).mockImplementation(
+      async () => ({
+        nativeComputeTimeMs: 1,
+        average: 0,
+        min: 0,
+        max: 0,
+        trend: 0,
+        checksum: 799004929,
+      }),
+    );
+
+    let tree: renderer.ReactTestRenderer;
+    await act(async () => {
+      tree = renderer.create(<DashboardBenchmarkScreen />);
+    });
+
+    const root = tree!.root;
+    await pressText(root, '1000');
+    await pressTitle(root, 'Run Decision Test');
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    const helperRuns = getDashboardRuns().filter(
+      run => run.benchmarkCategory === 'offloading_decision_helper',
+    );
+    expect(helperRuns).toHaveLength(1);
+    expect(helperRuns[0].operationCount).toBe(5);
+    expect(helperRuns[0].notes).toContain('helperVersion=2');
+    expect(helperRuns[0].notes).toContain('warmupRepetitions=1');
+    expect(helperRuns[0].notes).toContain('measuredRepetitions=5');
+    expect(helperRuns[0].notes).toContain('warmupExcluded=true');
+  });
+
+  it('does not log a helper row when warm-up validation fails', async () => {
+    (NativeModules.CRDTModule.runDashboardComputationProfiled as jest.Mock).mockImplementation(
+      async () => ({
+        nativeComputeTimeMs: 1,
+        average: 0,
+        min: 0,
+        max: 0,
+        trend: 0,
+        checksum: 1,
+      }),
+    );
+
+    let tree: renderer.ReactTestRenderer;
+    await act(async () => {
+      tree = renderer.create(<DashboardBenchmarkScreen />);
+    });
+
+    const root = tree!.root;
+    await pressText(root, '1000');
+    await pressTitle(root, 'Run Decision Test');
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    const helperRuns = getDashboardRuns().filter(
+      run => run.benchmarkCategory === 'offloading_decision_helper',
+    );
+    expect(helperRuns).toHaveLength(0);
+    const textContent = JSON.stringify(tree!.toJSON());
+    expect(textContent).toContain(
+      'Warm-up result validation failed. No measurement row was logged.',
+    );
   });
 });

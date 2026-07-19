@@ -1,6 +1,9 @@
 import {NativeModules} from 'react-native';
 
-import type {DashboardComputationResult} from '../dashboard/types';
+import type {
+  DashboardComputationProfiledResult,
+  DashboardComputationResult,
+} from '../dashboard/types';
 import type {LWWRegisterState} from '../crdt/js/lwwTypes';
 
 type BenchmarkMode = 'js' | 'native';
@@ -11,11 +14,63 @@ type NativeCRDTModule = {
   getValue(): Promise<number>;
   reset(): Promise<boolean>;
   runDashboardComputation(size: number): Promise<unknown>;
+  runDashboardComputationProfiled(size: number): Promise<unknown>;
   lwwSet(value: string, timestamp: number, replicaId: string): Promise<unknown>;
   lwwMerge(state: LWWRegisterState): Promise<unknown>;
   lwwGet(): Promise<unknown>;
   lwwReset(): Promise<boolean>;
 };
+
+function normalizeFiniteNumber(value: unknown, fieldName: string): number {
+  const normalized = Number(value);
+  if (!Number.isFinite(normalized)) {
+    throw new Error(`Invalid native dashboard computation field: ${fieldName}`);
+  }
+  return normalized;
+}
+
+function normalizeDashboardComputationResult(
+  result: unknown,
+): DashboardComputationResult {
+  if (!result || typeof result !== 'object') {
+    throw new Error('Invalid native dashboard computation result');
+  }
+
+  const normalizedValues = Array.isArray((result as any).normalizedValues)
+    ? ((result as any).normalizedValues as unknown[]).map(value =>
+        normalizeFiniteNumber(value, 'normalizedValues'),
+      )
+    : [];
+
+  return {
+    average: normalizeFiniteNumber((result as any).average, 'average'),
+    min: normalizeFiniteNumber((result as any).min, 'min'),
+    max: normalizeFiniteNumber((result as any).max, 'max'),
+    trend: normalizeFiniteNumber((result as any).trend, 'trend'),
+    normalizedValues,
+    checksum: normalizeFiniteNumber((result as any).checksum, 'checksum'),
+  };
+}
+
+function normalizeDashboardComputationProfiledResult(
+  result: unknown,
+): DashboardComputationProfiledResult {
+  if (!result || typeof result !== 'object') {
+    throw new Error('Invalid native profiled dashboard computation result');
+  }
+
+  return {
+    nativeComputeTimeMs: normalizeFiniteNumber(
+      (result as any).nativeComputeTimeMs,
+      'nativeComputeTimeMs',
+    ),
+    checksum: normalizeFiniteNumber((result as any).checksum, 'checksum'),
+    average: normalizeFiniteNumber((result as any).average, 'average'),
+    min: normalizeFiniteNumber((result as any).min, 'min'),
+    max: normalizeFiniteNumber((result as any).max, 'max'),
+    trend: normalizeFiniteNumber((result as any).trend, 'trend'),
+  };
+}
 
 function parseLWWState(result: unknown): LWWRegisterState {
   if (!result || typeof result !== 'object') {
@@ -69,23 +124,17 @@ export const NativeCRDT = {
   async runDashboardComputation(
     size: number,
   ): Promise<DashboardComputationResult> {
-    const result = await getModule().runDashboardComputation(size);
-    if (!result || typeof result !== 'object') {
-      throw new Error('Invalid native dashboard computation result');
-    }
+    return normalizeDashboardComputationResult(
+      await getModule().runDashboardComputation(size),
+    );
+  },
 
-    const normalizedValues = Array.isArray((result as any).normalizedValues)
-      ? ((result as any).normalizedValues as unknown[]).map(n => Number(n))
-      : [];
-
-    return {
-      average: Number((result as any).average),
-      min: Number((result as any).min),
-      max: Number((result as any).max),
-      trend: Number((result as any).trend),
-      normalizedValues,
-      checksum: Number((result as any).checksum),
-    };
+  async runDashboardComputationProfiled(
+    workloadSize: number,
+  ): Promise<DashboardComputationProfiledResult> {
+    return normalizeDashboardComputationProfiledResult(
+      await getModule().runDashboardComputationProfiled(workloadSize),
+    );
   },
 
   async lwwSet(

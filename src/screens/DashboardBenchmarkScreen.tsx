@@ -9,6 +9,12 @@ import {
   View,
 } from 'react-native';
 
+import {
+  DECISION_HELPER_MEASURED_REPETITIONS,
+  DECISION_HELPER_WARMUP_REPETITIONS,
+  runOffloadingDecisionProtocol,
+  type OffloadingDecisionSummary,
+} from '../dashboard/offloadingDecision';
 import {runDashboardComputation} from '../dashboard/js/dashboardComputation';
 import type {DashboardComputationResult} from '../dashboard/types';
 import {
@@ -32,6 +38,10 @@ type DashboardRunSnapshot = ActiveRunSnapshot<
 const BENCHMARK_DURATION_MS = 60_000;
 const PREVIEW_BAR_COUNT = 60;
 const PREVIEW_SPARK_COUNT = 40;
+const DASHBOARD_EXPORT_CATEGORIES = new Set<BenchmarkRun['benchmarkCategory']>([
+  'dashboard_continuous',
+  'offloading_decision_helper',
+]);
 
 function nowMs(): number {
   const p = (globalThis as any).performance;
@@ -92,11 +102,51 @@ function resample(values: number[], sampleSize: number): number[] {
 function getDashboardRuns(): BenchmarkRun[] {
   return sharedBenchmarkLogger
     .getRuns()
-    .filter(run => run.benchmarkCategory === 'dashboard_continuous');
+    .filter(run => DASHBOARD_EXPORT_CATEGORIES.has(run.benchmarkCategory));
 }
 
 function fireAndForget(task: Promise<unknown>): void {
   task.catch(() => {});
+}
+
+function formatStats(meanValue: number, stdDevValue: number): string {
+  return `${formatNumber(meanValue, 3)} ± ${formatNumber(stdDevValue, 3)} ms`;
+}
+
+function recommendationLabel(
+  recommendation: OffloadingDecisionSummary['recommendation'],
+): string {
+  switch (recommendation) {
+    case 'native_beneficial':
+      return 'Native offloading recommended';
+    case 'bridge_cancels_benefit':
+      return 'Swift computation is faster, but bridge overhead cancels the benefit';
+    case 'keep_js':
+    default:
+      return 'Keep this workload in JavaScript';
+  }
+}
+
+function helperNotes(summary: OffloadingDecisionSummary): string {
+  return [
+    'helperVersion=2',
+    'bridge=classic',
+    `warmupRepetitions=${summary.warmupRepetitions}`,
+    `measuredRepetitions=${summary.measuredRepetitions}`,
+    'warmupExcluded=true',
+    'durationIncludesWarmup=true',
+    `jsMean=${summary.jsMeanMs.toFixed(6)}`,
+    `jsStdDev=${summary.jsStdDevMs.toFixed(6)}`,
+    `nativeInternalMean=${summary.nativeInternalMeanMs.toFixed(6)}`,
+    `nativeInternalStdDev=${summary.nativeInternalStdDevMs.toFixed(6)}`,
+    `nativeRoundTripMean=${summary.nativeRoundTripMeanMs.toFixed(6)}`,
+    `nativeRoundTripStdDev=${summary.nativeRoundTripStdDevMs.toFixed(6)}`,
+    `estimatedBridgeOverheadMean=${summary.estimatedBridgeOverheadMeanMs.toFixed(6)}`,
+    `estimatedBridgeOverheadStdDev=${summary.estimatedBridgeOverheadStdDevMs.toFixed(6)}`,
+    `recommendation=${summary.recommendation}`,
+    `checksumDifference=${summary.checksumDifference.toFixed(6)}`,
+    `checksumValid=${summary.checksumValid ? 'true' : 'false'}`,
+  ].join('; ');
 }
 
 function Segment<T extends number>({
@@ -201,6 +251,10 @@ export function DashboardBenchmarkScreen(): React.JSX.Element {
   const [operationCount, setOperationCount] = useState(0);
   const [avgOpMs, setAvgOpMs] = useState(0);
   const [maxOpMs, setMaxOpMs] = useState(0);
+  const [isHelperRunning, setIsHelperRunning] = useState(false);
+  const [helperStatusMessage, setHelperStatusMessage] = useState('');
+  const [helperResult, setHelperResult] =
+    useState<OffloadingDecisionSummary | null>(null);
 
   const tickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const autoStopTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -212,6 +266,9 @@ export function DashboardBenchmarkScreen(): React.JSX.Element {
   const avgOpMsRef = useRef(0);
   const maxOpMsRef = useRef(0);
   const latestResultRef = useRef<DashboardComputationResult | null>(null);
+  const helperExecutionIdRef = useRef(0);
+  const helperRunningRef = useRef(false);
+  const mountedRef = useRef(true);
   const lifecycleRef = useRef(
     new BenchmarkRunLifecycle<
       Exclude<RunMode, 'idle'>,
@@ -220,6 +277,7 @@ export function DashboardBenchmarkScreen(): React.JSX.Element {
   );
 
   const isRunning = mode !== 'idle';
+  const isBusy = isRunning || isHelperRunning;
   const previewBars = useMemo(
     () => resample(result?.normalizedValues ?? [], PREVIEW_BAR_COUNT),
     [result],
@@ -285,6 +343,11 @@ export function DashboardBenchmarkScreen(): React.JSX.Element {
   );
 
   const resetState = useCallback(() => {
+    helperExecutionIdRef.current += 1;
+    helperRunningRef.current = false;
+    setIsHelperRunning(false);
+    setHelperStatusMessage('');
+    setHelperResult(null);
     lifecycleRef.current.cleanup();
     stopLoop();
     setElapsedMs(0);
@@ -315,6 +378,27 @@ export function DashboardBenchmarkScreen(): React.JSX.Element {
     [],
   );
 
+  const cancelHelperExecution = useCallback(
+    ({
+      clearResult = false,
+      clearStatus = false,
+    }: {
+      clearResult?: boolean;
+      clearStatus?: boolean;
+    } = {}) => {
+      helperExecutionIdRef.current += 1;
+      helperRunningRef.current = false;
+      setIsHelperRunning(false);
+      if (clearStatus) {
+        setHelperStatusMessage('');
+      }
+      if (clearResult) {
+        setHelperResult(null);
+      }
+    },
+    [],
+  );
+
   const stopCurrentRun = useCallback(() => {
     const activeRun = lifecycleRef.current.getActiveRun();
     if (activeRun === null) {
@@ -331,7 +415,7 @@ export function DashboardBenchmarkScreen(): React.JSX.Element {
 
   const startBenchmark = useCallback(
     async (runMode: 'js' | 'native') => {
-      if (lifecycleRef.current.hasActiveRun()) {
+      if (lifecycleRef.current.hasActiveRun() || helperRunningRef.current) {
         return;
       }
 
@@ -425,17 +509,113 @@ export function DashboardBenchmarkScreen(): React.JSX.Element {
     [computeTick, finalizeAutoRun, selectedIntervalMs, selectedSize, stopLoop],
   );
 
+  const runDecisionTest = useCallback(async () => {
+    if (lifecycleRef.current.hasActiveRun() || helperRunningRef.current) {
+      return;
+    }
+
+    const helperExecutionId = helperExecutionIdRef.current + 1;
+    helperExecutionIdRef.current = helperExecutionId;
+    helperRunningRef.current = true;
+    setIsHelperRunning(true);
+    setHelperResult(null);
+    setHelperStatusMessage('Warming up JavaScript and Classic Bridge...');
+
+    const startedAt = new Date().toISOString();
+    const startedPerfMs = nowMs();
+
+    try {
+      const protocolResult = await runOffloadingDecisionProtocol({
+        workloadSize: selectedSize,
+        nowMs,
+        runJsComputation: () => runDashboardComputation(selectedSize),
+        runNativeComputation: () =>
+          NativeCRDT.runDashboardComputationProfiled(selectedSize),
+        isCancelled: () =>
+          helperExecutionIdRef.current !== helperExecutionId || !mountedRef.current,
+        onWarmupStart: () => {
+          setHelperStatusMessage('Warming up JavaScript and Classic Bridge...');
+        },
+        onMeasuredRepetitionStart: (repetition, total) => {
+          setHelperStatusMessage(
+            `Running measured repetition ${repetition} of ${total}...`,
+          );
+        },
+      });
+
+      if (
+        helperExecutionIdRef.current !== helperExecutionId ||
+        !mountedRef.current
+      ) {
+        return;
+      }
+
+      const decision = protocolResult.summary;
+      setHelperResult(decision);
+
+      if (!decision.checksumValid) {
+        setHelperStatusMessage(
+          'Measured result validation failed. No measurement row was logged.',
+        );
+        return;
+      }
+
+      sharedBenchmarkLogger.addRun({
+        startedAt,
+        endedAt: new Date().toISOString(),
+        mode: 'native',
+        benchmarkCategory: 'offloading_decision_helper',
+        scenarioName: `offloading_decision_helper_${selectedSize}`,
+        intervalMs: 0,
+        durationMs: Math.max(0, nowMs() - startedPerfMs),
+        operationCount: DECISION_HELPER_MEASURED_REPETITIONS,
+        finalCrdtValue: 0,
+        averageOperationTimeMs: decision.nativeRoundTripMeanMs,
+        maxOperationTimeMs: protocolResult.samples.maxMeasuredRoundTripMs,
+        burstSize: 0,
+        burstMergeTimeMs: 0,
+        notes: helperNotes(decision),
+      });
+      setSavedRunsCount(getDashboardRuns().length);
+      setHelperStatusMessage(
+        'Offloading Decision Helper completed and logged as a supplementary row.',
+      );
+    } catch (error: any) {
+      if (
+        helperExecutionIdRef.current === helperExecutionId &&
+        mountedRef.current
+      ) {
+        const errorMessage = String(error?.message ?? error);
+        setHelperStatusMessage(
+          errorMessage === 'OFFLOADING_DECISION_WARMUP_CHECKSUM_FAILED'
+            ? 'Warm-up result validation failed. No measurement row was logged.'
+            : errorMessage === 'OFFLOADING_DECISION_MEASURED_CHECKSUM_FAILED'
+              ? 'Measured result validation failed. No measurement row was logged.'
+              : errorMessage === 'OFFLOADING_DECISION_CANCELLED'
+                ? ''
+                : `Decision helper failed: ${errorMessage}`,
+        );
+      }
+    } finally {
+      if (helperExecutionIdRef.current === helperExecutionId) {
+        helperRunningRef.current = false;
+        setIsHelperRunning(false);
+      }
+    }
+  }, [selectedSize]);
+
   const clearResults = useCallback(() => {
+    cancelHelperExecution({clearResult: true, clearStatus: true});
     const removedCount = sharedBenchmarkLogger.removeRuns(
-      run => run.benchmarkCategory === 'dashboard_continuous',
+      run => DASHBOARD_EXPORT_CATEGORIES.has(run.benchmarkCategory),
     );
     setSavedRunsCount(getDashboardRuns().length);
     setStatusMessage(
       removedCount > 0
-        ? 'Dashboard results cleared.'
+        ? 'Dashboard and helper results cleared.'
         : 'No dashboard results were stored.',
     );
-  }, []);
+  }, [cancelHelperExecution]);
 
   const exportCSV = useCallback(async () => {
     const runs = getDashboardRuns();
@@ -473,10 +653,17 @@ export function DashboardBenchmarkScreen(): React.JSX.Element {
   useEffect(() => {
     const lifecycle = lifecycleRef.current;
     return () => {
+      mountedRef.current = false;
+      helperExecutionIdRef.current += 1;
+      helperRunningRef.current = false;
       lifecycle.cleanup();
       stopLoop();
     };
   }, [stopLoop]);
+
+  useEffect(() => {
+    mountedRef.current = true;
+  }, []);
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -500,10 +687,12 @@ export function DashboardBenchmarkScreen(): React.JSX.Element {
             options={sizeOptions}
             selected={selectedSize}
             onSelect={value => {
-              if (isRunning) {
+              if (isBusy) {
                 Alert.alert(
                   'Stop first',
-                  'Stop the current benchmark before changing workload size or update interval.',
+                  isRunning
+                    ? 'Stop the current benchmark before changing workload size or update interval.'
+                    : 'Wait for the supplementary helper to finish before changing workload size or update interval.',
                 );
                 return;
               }
@@ -519,10 +708,12 @@ export function DashboardBenchmarkScreen(): React.JSX.Element {
             options={intervalOptions}
             selected={selectedIntervalMs}
             onSelect={value => {
-              if (isRunning) {
+              if (isBusy) {
                 Alert.alert(
                   'Stop first',
-                  'Stop the current benchmark before changing workload size or update interval.',
+                  isRunning
+                    ? 'Stop the current benchmark before changing workload size or update interval.'
+                    : 'Wait for the supplementary helper to finish before changing workload size or update interval.',
                 );
                 return;
               }
@@ -538,12 +729,12 @@ export function DashboardBenchmarkScreen(): React.JSX.Element {
             <Button
               title="Start JS Dashboard"
               onPress={() => fireAndForget(startBenchmark('js'))}
-              disabled={isRunning}
+              disabled={isBusy}
             />
             <Button
               title="Start Native Dashboard"
               onPress={() => fireAndForget(startBenchmark('native'))}
-              disabled={isRunning}
+              disabled={isBusy}
             />
           </View>
           <View style={styles.buttonRow}>
@@ -568,13 +759,13 @@ export function DashboardBenchmarkScreen(): React.JSX.Element {
             <Button
               title="Export CSV"
               onPress={() => fireAndForget(exportCSV())}
-              disabled={savedRunsCount === 0}
+              disabled={savedRunsCount === 0 || isHelperRunning}
               kind="secondary"
             />
             <Button
               title="Copy CSV"
               onPress={() => fireAndForget(copyCSV())}
-              disabled={savedRunsCount === 0}
+              disabled={savedRunsCount === 0 || isHelperRunning}
               kind="secondary"
             />
           </View>
@@ -595,6 +786,107 @@ export function DashboardBenchmarkScreen(): React.JSX.Element {
             label="Scenario name"
             value={`dashboard_continuous_${selectedSize}_${selectedIntervalMs}ms`}
           />
+        </View>
+
+        <View style={styles.block}>
+          <Text style={styles.blockTitle}>Offloading Decision Helper</Text>
+          <Text style={styles.note}>
+            Supplementary Classic Bridge runtime calibration
+          </Text>
+          <Text style={styles.note}>
+            Runs one unmeasured warm-up repetition followed by five measured
+            sequential repetitions for the selected workload.
+          </Text>
+          <Text style={styles.note}>
+            Warm-up values are excluded from all reported statistics. This
+            helper compares JS compute-only time, Swift internal computation
+            time, full Classic Bridge round-trip time, and estimated bridge
+            overhead. It is workload-specific and not part of the primary
+            60-second benchmark protocol.
+          </Text>
+          <View style={styles.buttonRow}>
+            <Button
+              title="Run Decision Test"
+              onPress={() => fireAndForget(runDecisionTest())}
+              disabled={isBusy}
+              layout="full"
+            />
+          </View>
+          {helperStatusMessage.length > 0 ? (
+            <Text style={styles.note}>{helperStatusMessage}</Text>
+          ) : null}
+          {helperResult ? (
+            <View style={styles.helperDetails}>
+              <MetricRow
+                label="Workload size"
+                value={formatSizeLabel(helperResult.workloadSize as WorkloadSize)}
+              />
+              <MetricRow
+                label="Warm-up"
+                value={`${DECISION_HELPER_WARMUP_REPETITIONS} unmeasured repetition`}
+              />
+              <MetricRow
+                label="Measured repetitions"
+                value={String(helperResult.measuredRepetitions)}
+              />
+              <Text style={styles.note}>
+                Timing values are reported as mean ± sample standard deviation.
+              </Text>
+              <MetricRow
+                label="JS compute (mean ± SD)"
+                value={formatStats(
+                  helperResult.jsMeanMs,
+                  helperResult.jsStdDevMs,
+                )}
+              />
+              <MetricRow
+                label="Swift internal (mean ± SD)"
+                value={formatStats(
+                  helperResult.nativeInternalMeanMs,
+                  helperResult.nativeInternalStdDevMs,
+                )}
+              />
+              <MetricRow
+                label="Classic Bridge round-trip (mean ± SD)"
+                value={formatStats(
+                  helperResult.nativeRoundTripMeanMs,
+                  helperResult.nativeRoundTripStdDevMs,
+                )}
+              />
+              <MetricRow
+                label="Estimated bridge overhead (mean ± SD)"
+                value={formatStats(
+                  helperResult.estimatedBridgeOverheadMeanMs,
+                  helperResult.estimatedBridgeOverheadStdDevMs,
+                )}
+              />
+              <MetricRow
+                label="Result validation"
+                value={helperResult.checksumValid ? 'PASS' : 'FAIL'}
+              />
+              <MetricRow
+                label="Checksum difference"
+                value={helperResult.checksumDifference.toFixed(6)}
+              />
+              <MetricRow
+                label="CSV category"
+                value="offloading_decision_helper"
+              />
+              <Text style={styles.note}>
+                JavaScript and Swift results are considered equivalent when the
+                checksum difference is within the configured floating-point
+                tolerance.
+              </Text>
+              <Text style={styles.helperRecommendation}>
+                {recommendationLabel(helperResult.recommendation)}
+              </Text>
+              <Text style={styles.note}>{helperResult.reason}</Text>
+              <Text style={styles.note}>
+                Decision rule: Native is recommended only when the complete
+                Classic Bridge round trip is faster than JavaScript computation.
+              </Text>
+            </View>
+          ) : null}
         </View>
 
         <View style={styles.block}>
@@ -733,6 +1025,8 @@ const styles = StyleSheet.create({
   metricCardLabel: {fontSize: 12, color: '#555', fontWeight: '700'},
   metricCardValue: {fontSize: 22, color: '#111', fontWeight: '800'},
   metricChecksum: {fontSize: 13, color: '#444', fontWeight: '600'},
+  helperDetails: {gap: 8},
+  helperRecommendation: {fontSize: 16, fontWeight: '800', color: '#111'},
   previewBars: {
     minHeight: 110,
     flexDirection: 'row',
