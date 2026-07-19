@@ -1,0 +1,120 @@
+Dataset,Group,Mode/Architecture,Metric,N,Mean,Sample Standard Deviation,Unit
+Interval,20,js,Average operation time,5,0.02516152889001828,0.00022504308461464322,ms
+Interval,20,js,Maximum operation time,5,0.05709118843078613,0.0049745230993311915,ms
+Interval,20,js,Operation count,5,1800.8,1.0954451150103321,operations
+Interval,20,native,Average operation time,5,0.47333489682380403,0.005961256877265178,ms
+Interval,20,native,Maximum operation time,5,13.225925207138062,1.1238260087400427,ms
+Interval,20,native,Operation count,5,1800.4,0.8944271909999159,operations
+Interval,50,js,Average operation time,5,0.027685524084211346,0.0018247327183221111,ms
+Interval,50,js,Maximum operation time,5,0.05865836143493652,0.010962125316976521,ms
+Interval,50,js,Operation count,5,901.2,0.4472135954999579,operations
+Interval,50,native,Average operation time,5,0.6902229655728356,0.025400661963866353,ms
+Interval,50,native,Maximum operation time,5,10.99366660118103,3.541509133839092,ms
+Interval,50,native,Operation count,5,901.0,0.0,operations
+Interval,100,js,Average operation time,5,0.02683544950577819,0.0007774973711196989,ms
+Interval,100,js,Maximum operation time,5,0.05760002136230469,0.011640855089600582,ms
+Interval,100,js,Operation count,5,515.0,0.0,operations
+Interval,100,native,Average operation time,5,0.7190514933947221,0.016221260854178954,ms
+Interval,100,native,Maximum operation time,5,12.089008402824401,0.3966500104558546,ms
+Interval,100,native,Operation count,5,515.0,0.0,operations
+Dashboard 1000,20,js,Average operation time,5,1.5186705938,0.010666815122357254,ms
+Dashboard 1000,20,js,Maximum operation time,5,18.670116568,0.8457248872970858,ms
+Dashboard 1000,20,js,Operation count,5,1800.4,0.5477225575051661,operations
+Dashboard 1000,20,native,Average operation time,5,0.85092192684,0.007987027866338564,ms
+Dashboard 1000,20,native,Maximum operation time,5,16.228074835999998,2.955576913170952,ms
+Dashboard 1000,20,native,Operation count,5,1800.2,0.4472135954999579,operations
+Dashboard 1000,50,js,Average operation time,5,3.5605609017999997,0.04635209554890612,ms
+Dashboard 1000,50,js,Maximum operation time,5,17.7532002,2.569102579024795,ms
+Dashboard 1000,50,js,Operation count,5,901.0,0.0,operations
+Dashboard 1000,50,native,Average operation time,5,1.473537583,0.020845805179398526,ms
+Dashboard 1000,50,native,Maximum operation time,5,16.2531415936,3.5202173170393887,ms
+Dashboard 1000,50,native,Operation count,5,900.2,0.4472135954999579,operations
+Dashboard 1000,100,js,Average operation time,5,3.617229283,0.10544228322368293,ms
+Dashboard 1000,100,js,Maximum operation time,5,15.7188332334,4.455193057495704,ms
+Dashboard 1000,100,js,Operation count,5,515.0,0.0,operations
+Dashboard 1000,100,native,Average operation time,5,1.419536694,0.020869388389297326,ms
+Dashboard 1000,100,native,Maximum operation time,5,17.213133598,1.0069461667827155,ms
+Dashboard 1000,100,native,Operation count,5,515.0,0.0,operations
+Dashboard 5000,20,js,Average operation time,5,5.909926596360382,0.039194793282240896,ms
+Dashboard 5000,20,js,Maximum operation time,5,24.625166654586792,0.6402871940646353,ms
+Dashboard 5000,20,js,Operation count,5,1799.8,0.4472135954999579,operations
+Dashboard 5000,20,native,Average operation time,5,1.2062863646480773,0.005479931321373079,ms
+Dashboard 5000,20,native,Maximum operation time,5,18.21675820350647,1.7172949679279848,ms
+Dashboard 5000,20,native,Operation count,5,1800.0,0.0,operations
+Dashboard 5000,50,js,Average operation time,5,10.342027028269237,0.23002264630312738,ms
+Dashboard 5000,50,js,Maximum operation time,5,24.68047502040863,1.8945113091667753,ms
+Dashboard 5000,50,js,Operation count,5,900.0,0.0,operations
+Dashboard 5000,50,native,Average operation time,5,2.3159323889414467,0.022575750362523198,ms
+Dashboard 5000,50,native,Maximum operation time,5,17.156008195877074,0.47908289180956704,ms
+Dashboard 5000,50,native,Operation count,5,900.0,0.0,operations
+Dashboard 5000,100,js,Average operation time,5,14.948034047303718,0.5561610452217741,ms
+Dashboard 5000,100,js,Maximum operation time,5,25.31188361644745,2.6233123807863716,ms
+Dashboard 5000,100,js,Operation count,5,491.6,3.5777087639996634,operations
+Dashboard 5000,100,native,Average operation time,5,2.344324521555484,0.028837927711101323,ms
+Dashboard 5000,100,native,Maximum operation time,5,17.025374841690063,1.3055544472411529,ms
+Dashboard 5000,100,native,Operation count,5,515.0,0.0,operations
+Dashboard 10000,20,js,Average operation time,5,8.00403231713769,0.07493659386060594,ms
+Dashboard 10000,20,js,Maximum operation time,5,30.712691402435304,2.766530222454583,ms
+Dashboard 10000,20,js,Operation count,5,1799.8,0.4472135954999579,operations
+Dashboard 10000,20,native,Average operation time,5,1.5762944824563132,0.00398006192473925,ms
+Dashboard 10000,20,native,Maximum operation time,5,18.598991203308106,0.536236989020214,ms
+Dashboard 10000,20,native,Operation count,5,1800.0,0.0,operations
+Dashboard 10000,50,js,Average operation time,5,14.39347831334847,0.1692606710595699,ms
+Dashboard 10000,50,js,Maximum operation time,5,29.38505823612213,1.2305144318506536,ms
+Dashboard 10000,50,js,Operation count,5,863.6,5.366563145999495,operations
+Dashboard 10000,50,native,Average operation time,5,3.3970732815265654,0.03851950059565414,ms
+Dashboard 10000,50,native,Maximum operation time,5,17.222974801063536,0.5825981218599423,ms
+Dashboard 10000,50,native,Operation count,5,900.0,0.0,operations
+Dashboard 10000,100,js,Average operation time,5,23.83536958176679,0.17042347494526422,ms
+Dashboard 10000,100,js,Maximum operation time,5,30.287600350379943,0.5618746977468885,ms
+Dashboard 10000,100,js,Operation count,5,451.8,0.4472135954999579,operations
+Dashboard 10000,100,native,Average operation time,5,3.3840856072509173,0.03397245046184128,ms
+Dashboard 10000,100,native,Maximum operation time,5,17.383041405677794,1.9317747946922952,ms
+Dashboard 10000,100,native,Operation count,5,515.0,0.0,operations
+Per-op Increments,1000,classic_bridge,Average operation time,5,0.11685494158267974,0.019051083998343703,ms/op
+Per-op Increments,1000,classic_bridge,Total duration,5,116.85494158267974,19.051083998343703,ms
+Per-op Increments,1000,js,Average operation time,5,0.0012757084131240846,2.5769932597860204e-05,ms/op
+Per-op Increments,1000,js,Total duration,5,1.2757084131240846,0.025769932597860198,ms
+Per-op Increments,1000,turbo_module,Average operation time,5,0.09785333342552185,0.017018165623520255,ms/op
+Per-op Increments,1000,turbo_module,Total duration,5,97.85333342552185,17.018165623520257,ms
+Per-op Increments,5000,classic_bridge,Average operation time,5,0.07739230827331543,0.0003695874148364656,ms/op
+Per-op Increments,5000,classic_bridge,Total duration,5,386.96154136657714,1.8479370741823335,ms
+Per-op Increments,5000,js,Average operation time,5,0.001189505000114441,3.1162642170035115e-05,ms/op
+Per-op Increments,5000,js,Total duration,5,5.947525000572204,0.15581321085017552,ms
+Per-op Increments,5000,turbo_module,Average operation time,5,0.04597521663665771,0.000515196998605405,ms/op
+Per-op Increments,5000,turbo_module,Total duration,5,229.87608318328859,2.5759849930270247,ms
+Per-op Increments,10000,classic_bridge,Average operation time,5,0.07110090163946152,0.0001290592276665604,ms/op
+Per-op Increments,10000,classic_bridge,Total duration,5,711.0090163946152,1.2905922766656244,ms
+Per-op Increments,10000,js,Average operation time,5,0.0010349991989135742,5.902561604418551e-05,ms/op
+Per-op Increments,10000,js,Total duration,5,10.349991989135741,0.5902561604418554,ms
+Per-op Increments,10000,turbo_module,Average operation time,5,0.03877612668037415,0.00013747488562501997,ms/op
+Per-op Increments,10000,turbo_module,Total duration,5,387.7612668037415,1.3747488562501955,ms
+Burst Architecture,1000,classic_bridge,Burst merge time,5,34.396258163452146,5.960646935185675,ms
+Burst Architecture,1000,js,Burst merge time,5,8.311466598510743,1.2532943532448502,ms
+Burst Architecture,1000,turbo_module,Burst merge time,5,36.322416758537294,4.61559257681889,ms
+Burst Architecture,5000,classic_bridge,Burst merge time,5,52.386958193778995,3.4194799323335827,ms
+Burst Architecture,5000,js,Burst merge time,5,26.041208219528198,2.107281485371348,ms
+Burst Architecture,5000,turbo_module,Burst merge time,5,64.02342517375946,3.33113354145966,ms
+Burst Architecture,10000,classic_bridge,Burst merge time,5,68.63118300437927,3.0085045869809375,ms
+Burst Architecture,10000,js,Burst merge time,5,39.39480860233307,4.266841719701276,ms
+Burst Architecture,10000,turbo_module,Burst merge time,5,87.67811658382416,2.311148472141625,ms
+Burst Merge,500,js,Burst merge time,5,2.9561747789382933,0.07033238787522157,ms
+Burst Merge,500,native,Burst merge time,5,7.957383155822754,0.1980998938494594,ms
+Burst Merge,1000,js,Burst merge time,5,5.38230836391449,0.47644911491244596,ms
+Burst Merge,1000,native,Burst merge time,5,12.970583391189574,0.42306828725709233,ms
+Burst Merge,5000,js,Burst merge time,5,14.563849806785583,2.190844929089857,ms
+Burst Merge,5000,native,Burst merge time,5,29.846866798400878,1.6298536997145743,ms
+Burst Merge,10000,js,Burst merge time,5,22.35951657295227,1.2227548405812516,ms
+Burst Merge,10000,native,Burst merge time,5,43.726391839981076,0.9777551827139992,ms
+Offloading Helper,1000,classic_bridge,JS compute,3,1.2835136666666667,0.036567090687301546,ms
+Offloading Helper,1000,classic_bridge,Swift internal,3,0.07981666666666666,0.011290213564558173,ms
+Offloading Helper,1000,classic_bridge,Classic Bridge round-trip,3,4.584886,0.1748700444673129,ms
+Offloading Helper,1000,classic_bridge,Estimated bridge overhead,3,4.505069333333333,0.16725735050015994,ms
+Offloading Helper,5000,classic_bridge,JS compute,3,4.847097333333333,0.04946968411394332,ms
+Offloading Helper,5000,classic_bridge,Swift internal,3,0.27858866666666665,0.03240380450399819,ms
+Offloading Helper,5000,classic_bridge,Classic Bridge round-trip,3,3.2698586666666665,0.014455650567627026,ms
+Offloading Helper,5000,classic_bridge,Estimated bridge overhead,3,2.991269,0.040665314618234555,ms
+Offloading Helper,10000,classic_bridge,JS compute,3,7.606727666666667,0.2198532061452216,ms
+Offloading Helper,10000,classic_bridge,Swift internal,3,0.33945,0.003750038533135356,ms
+Offloading Helper,10000,classic_bridge,Classic Bridge round-trip,3,2.605511,0.03704647031769697,ms
+Offloading Helper,10000,classic_bridge,Estimated bridge overhead,3,2.266061,0.04069183243600614,ms

@@ -83,3 +83,26 @@ Manually stopped runs should be treated as inspection-only unless repeated under
 Per-operation native scenarios intentionally include JavaScript-to-native call overhead. Burst scenarios evaluate a more practical batched offloading pattern where many updates are processed through a single native call.
 
 Flipper, if used, is an optional debugging aid and not a source of performance measurements.
+
+## Final Benchmark Results
+
+The final raw datasets, processed statistical summaries, and thesis-ready figures are available under `results/`.
+
+- Overview: [`results/README.md`](results/README.md)
+- Raw datasets: [`results/raw/`](results/raw/)
+- Processed summaries: [`results/processed/`](results/processed/)
+- Final figures: [`results/figures/`](results/figures/)
+
+### Selected results
+
+#### Dashboard workload — size 10,000
+
+![Dashboard workload size 10000](results/figures/04_dashboard_workload_10000_mean_sd.png)
+
+#### Burst merge architecture comparison
+
+![Burst merge architecture comparison](results/figures/06_burst_merge_architecture_mean_sd.png)
+
+#### Offloading Decision Helper
+
+![Offloading Decision Helper](results/figures/08_offloading_decision_helper_mean_sd.png)
