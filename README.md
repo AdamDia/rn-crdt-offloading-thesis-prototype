@@ -19,6 +19,7 @@ It also includes a deterministic dashboard-derived workload to evaluate native o
 - **CRDT burst merge benchmark** for deterministic merges of `500`, `1000`, `5000`, and `10000` entries
 - **Dashboard workload benchmark** for repeated synthetic dashboard computation with configurable workload size and update interval
 - **Architecture comparison benchmark** for JavaScript, classic bridge, and TurboModule call patterns
+- **Offloading Decision Helper** as a supplementary Classic Bridge runtime calibration for the selected dashboard workload
 - **Secondary LWW Register validation** to cover the second lightweight CRDT type mentioned in the proposal
 - **Supplementary Network Condition Demo** to support the temporary-disconnection and reconnection-burst demonstration described in the proposal
 
@@ -31,6 +32,8 @@ It also includes a deterministic dashboard-derived workload to evaluate native o
 - `src/metrics/` provides shared run logging and CSV export
 
 The classic bridge path is kept as a legacy interoperability baseline. The TurboModule path is included to compare the same CRDT logic against React Native’s New Architecture integration model.
+
+The Offloading Decision Helper is supplementary only. It runs one predetermined unmeasured warm-up repetition followed by five measured sequential repetitions for the currently selected dashboard workload. Warm-up timings are excluded from all reported statistics, no post-hoc outlier removal is performed, and the decision metric is the complete Classic Bridge round-trip mean rather than Swift internal time alone. Reported timing rows use mean ± sample standard deviation, results must pass checksum validation before logging, and the supplementary row is stored under `offloading_decision_helper` outside the primary statistical benchmark protocol.
 
 ## Run on iOS
 

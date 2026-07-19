@@ -12,6 +12,7 @@ final class CRDTModule: NSObject {
   private let queue = DispatchQueue(label: "crdt.queue", qos: .userInitiated)
   private var state: [String: Int] = [:]
   private var lwwState = LWWState(value: "", timestamp: 0, replicaId: "")
+  private let allowedDashboardSizes: Set<Int> = [1000, 5000, 10000]
   private let dashboardWindowSize = 20
   private let dashboardSampleSize = 60
 
@@ -125,16 +126,36 @@ final class CRDTModule: NSObject {
     resolver resolve: @escaping RCTPromiseResolveBlock,
     rejecter reject: @escaping RCTPromiseRejectBlock
   ) {
-    let n = size.intValue
-    let allowed: Set<Int> = [1000, 5000, 10000]
-    guard allowed.contains(n) else {
-      reject("E_INVALID_SIZE", "size must be one of 1000, 5000, 10000", nil)
-      return
-    }
+    guard let n = validatedDashboardSize(size, rejecter: reject) else { return }
 
     queue.async {
       let result = self.computeDashboardComputation(size: n)
       resolve(result)
+    }
+  }
+
+  @objc(runDashboardComputationProfiled:resolver:rejecter:)
+  func runDashboardComputationProfiled(
+    _ size: NSNumber,
+    resolver resolve: @escaping RCTPromiseResolveBlock,
+    rejecter reject: @escaping RCTPromiseRejectBlock
+  ) {
+    guard let n = validatedDashboardSize(size, rejecter: reject) else { return }
+
+    queue.async {
+      let startedAt = DispatchTime.now().uptimeNanoseconds
+      let result = self.computeDashboardComputation(size: n)
+      let endedAt = DispatchTime.now().uptimeNanoseconds
+      let nativeComputeTimeMs = Double(endedAt - startedAt) / 1_000_000.0
+
+      resolve([
+        "nativeComputeTimeMs": nativeComputeTimeMs,
+        "checksum": result["checksum"] ?? 0,
+        "average": result["average"] ?? 0.0,
+        "min": result["min"] ?? 0.0,
+        "max": result["max"] ?? 0.0,
+        "trend": result["trend"] ?? 0.0,
+      ])
     }
   }
 
@@ -276,6 +297,18 @@ final class CRDTModule: NSObject {
       "checksum": checksum,
       "workloadSize": n,
     ]
+  }
+
+  private func validatedDashboardSize(
+    _ size: NSNumber,
+    rejecter reject: @escaping RCTPromiseRejectBlock
+  ) -> Int? {
+    let n = size.intValue
+    guard allowedDashboardSizes.contains(n) else {
+      reject("E_INVALID_SIZE", "size must be one of 1000, 5000, 10000", nil)
+      return nil
+    }
+    return n
   }
 
   private func generateTelemetryPoint(i: Int) -> Double {

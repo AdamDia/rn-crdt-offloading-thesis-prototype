@@ -5,6 +5,7 @@ Run repeatable benchmark scenarios to compare:
 - **Primary CRDT benchmark:** JavaScript G-Counter vs Swift classic bridge G-Counter
 - **Secondary validation:** LWW Register correctness in JavaScript and Swift
 - **Dashboard workload benchmark:** deterministic dashboard-derived computation under repeated UI updates
+- **Supplementary Classic Bridge calibration:** workload-specific Offloading Decision Helper for the current dashboard selection
 - **Architecture comparison benchmark:** JavaScript vs classic bridge vs TurboModule call paths
 - **Supplementary network demonstration:** real connectivity checks plus deterministic local reconnection bursts
 
@@ -71,9 +72,31 @@ Results are exported to **CSV** for analysis and plotting.
 - The dashboard preview uses deterministic derived signal values generated from the same workload each run.
 - These values are synthetic workload outputs, not application business data.
 
+## Supplementary Classic Bridge calibration
+
+### Scenario J — Offloading Decision Helper
+- Run **1 predetermined unmeasured warm-up repetition** followed by **5 measured sequential repetitions** for the currently selected dashboard workload size.
+- Use the warm-up only to reduce one-time initialization effects such as first bridge activation and runtime scheduling setup.
+- Exclude all warm-up timings from the reported statistics.
+- Compare:
+  - JavaScript compute-only time
+  - Swift internal computation time
+  - complete Classic Bridge round-trip time
+  - estimated bridge overhead
+- Report timing rows as **mean ± sample standard deviation**.
+- Accept the result only when JavaScript and Swift checksums match within the configured floating-point tolerance.
+- Do not sort, trim, or remove measured outliers after collection.
+- Output a workload-specific recommendation:
+  - `native_beneficial`
+  - `bridge_cancels_benefit`
+  - `keep_js`
+- Recommendation rule: Native is recommended only when the complete Classic Bridge round-trip mean is lower than the JavaScript compute mean.
+- Export the supplementary row as CSV category `offloading_decision_helper`.
+- This helper is not part of the primary repeated benchmark protocol and is not a general-purpose code analyzer.
+
 ## Architecture comparison benchmark
 
-### Scenario J — Per-operation increments
+### Scenario K — Per-operation increments
 - Run awaited increment operations for:
   - `js`
   - `classic_bridge`
@@ -84,7 +107,7 @@ Results are exported to **CSV** for analysis and plotting.
   - `10000`
 - Purpose: measure per-call overhead directly.
 
-### Scenario K — One-call burst merges
+### Scenario L — One-call burst merges
 - Run one deterministic merge call for:
   - `js`
   - `classic_bridge`
@@ -97,7 +120,7 @@ Results are exported to **CSV** for analysis and plotting.
 
 ## Supplementary network demonstration
 
-### Scenario L — Network Condition Demo
+### Scenario M — Network Condition Demo
 - Use Apple Network Link Conditioner to affect the real in-app connectivity check.
 - Use a deterministic local G-Counter burst merge to model reconnection handling without a backend dependency.
 - Purpose: support the proposal’s temporary-disconnection narrative while keeping performance measurements reproducible.
@@ -116,6 +139,7 @@ Results are exported to **CSV** for analysis and plotting.
   - `crdt_interval`: sustained CRDT increment runs (interval_100ms / 50ms / 20ms)
   - `crdt_burst`: CRDT burst merge runs (burst_merge_*)
   - `dashboard_continuous`: continuous dashboard stress runs (dashboard_continuous_<size>_<interval>ms)
+  - `offloading_decision_helper`: supplementary Classic Bridge calibration for the selected dashboard workload
   - `architecture_comparison`: JS / classic bridge / TurboModule comparison scenarios
 - `operationCount`
   - sustained runs: number of benchmark operations executed
@@ -139,12 +163,13 @@ Results are exported to **CSV** for analysis and plotting.
   - G-Counter burst merge benchmarks
   - dashboard workload benchmarks
   - architecture comparison benchmarks
-- LWW Register validation and the Network Condition Demo are supportive checks, not part of the official repeated performance dataset.
+- LWW Register validation, the Offloading Decision Helper, and the Network Condition Demo are supportive checks, not part of the official repeated performance dataset.
 
 ## Interpretation Support
 - The **G-Counter** benchmark is the deterministic synchronization baseline.
 - The **LWW Register** is included as a secondary correctness validation case, not a primary performance benchmark.
 - The **dashboard workload benchmark** adds repeated derived computation and UI update pressure on top of deterministic inputs.
+- The **Offloading Decision Helper** calibrates whether one selected dashboard workload benefits from Classic Bridge offloading once round-trip overhead is included.
 - The **architecture comparison benchmark** separates interop cost from batched merge cost:
   - per-operation native calls expose bridge overhead directly
   - burst merges model the more practical offloading case where work is batched before crossing the JS/native boundary

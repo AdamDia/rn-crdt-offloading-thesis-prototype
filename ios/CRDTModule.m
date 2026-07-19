@@ -31,6 +31,12 @@ RCT_EXTERN_METHOD(
 )
 
 RCT_EXTERN_METHOD(
+  runDashboardComputationProfiled:(nonnull NSNumber *)size
+  resolver:(RCTPromiseResolveBlock)resolve
+  rejecter:(RCTPromiseRejectBlock)reject
+)
+
+RCT_EXTERN_METHOD(
   lwwSet:(NSString *)value
   timestamp:(nonnull NSNumber *)timestamp
   replicaId:(NSString *)replicaId

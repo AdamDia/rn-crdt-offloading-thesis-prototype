@@ -4,6 +4,7 @@ export type BenchmarkCategory =
   | 'crdt_interval'
   | 'crdt_burst'
   | 'dashboard_continuous'
+  | 'offloading_decision_helper'
   | 'architecture_comparison';
 
 export type BenchmarkRun = {

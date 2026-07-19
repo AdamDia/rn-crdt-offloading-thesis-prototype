@@ -6,3 +6,12 @@ export type DashboardComputationResult = {
   normalizedValues: number[];
   checksum: number;
 };
+
+export type DashboardComputationProfiledResult = {
+  nativeComputeTimeMs: number;
+  checksum: number;
+  average: number;
+  min: number;
+  max: number;
+  trend: number;
+};
